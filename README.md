@@ -2,6 +2,8 @@
 
 Change \*nix colorschemes on the fly ✈️ written in pure POSIX sh
 
+![Demo](.github/xcolor-demo-720.gif)
+
 ## How does it work?
 
 Xcolor comes in two parts: editing Xresources to include a configuration file which defines all the colors for the selected theme, and dynamically reloading all TTYs to the correct colors via escape sequences.
