@@ -1,6 +1,6 @@
 # Xcolor
 
-Change terminal colors on the fly ✈️ written in pure POSIX sh
+Change \*nix colorschemes on the fly ✈️ written in pure POSIX sh
 
 ## How does it work?
 
