@@ -2,7 +2,9 @@
 
 Change \*nix colorschemes on the fly ✈️ written in pure POSIX sh
 
-![Demo](.github/xcolor-demo-720.gif)
+<p align="center">
+    <img src=".github/xcolor-demo.gif" alt="Demo" width="480"/>
+</p>
 
 ## How does it work?
 
