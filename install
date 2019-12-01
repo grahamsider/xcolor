@@ -1,0 +1,11 @@
+#!/bin/sh
+
+CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
+
+if ! [ -d $CONFIGDIR ]; then
+    mkdir $CONFIGDIR
+fi
+
+cp themes/*.colors $CONFIGDIR/
+
+cat xres.defs >> $HOME/.Xresources
