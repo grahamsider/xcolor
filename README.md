@@ -1,10 +1,10 @@
+<p align="center">
+    <img src=".github/xcolor-demo-rounded.gif" alt="Demo" width="540"/>
+</p>
+
 # Xcolor
 
 Change \*nix colorschemes on the fly ✈️ written in pure POSIX sh
-
-<p align="center">
-    <img src=".github/xcolor-demo.gif" alt="Demo" width="480"/>
-</p>
 
 ## How does it work?
 
