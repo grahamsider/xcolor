@@ -43,4 +43,4 @@ Xcolor currently comes with 3 colorschemes pre-installed:
 - Nord
 - Seoul256
 
-More will be coming in the future, but if you want to make your own in the meantime, just copy a theme (located in the `themes` directory) and edit the colors to your liking. When you're finished, just copy it to `$XDG_CONFIG_HOME/xcolor/` and you're good to go!
+More will be coming in the future, but if you want to make your own in the meantime, make a copy of the template (located at `themes/template`) and edit the hex color values to your liking. When you're finished, just copy it to `$XDG_CONFIG_HOME/xcolor/` and you're good to go!

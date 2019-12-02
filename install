@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
 
 if ! [ -d $CONFIGDIR ]; then
@@ -7,5 +9,6 @@ if ! [ -d $CONFIGDIR ]; then
 fi
 
 cp themes/*.colors $CONFIGDIR/
-
 cat xres.defs >> $HOME/.Xresources
+
+exit 0
