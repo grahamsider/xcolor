@@ -18,11 +18,25 @@ Unfortunately, this change will only effect terminals opened after this point. T
 
 Xcolor is confirmed working with the following configurations:
 
-| Terms | WMs/DEs |   Bars  |               Notes              |
-|:-----:|:-------:|:-------:|:--------------------------------:|
-|   st  |    i3   | polybar | st requires the xresources patch |
+Terminal Emulators:
+
+* `urxvt`
+* `xterm`
+* `st` (requires xresources patch)
+
+WMs/DEs:
+
+* `i3`<sup>1</sup>
+
+Bars:
+
+* `polybar`<sup>2</sup>
 
 This list will be updated as more configurations are tested.
+
+Certain terminal emulators inherently will not allow you to source the colorscheme from `.Xresources`. One approach to get around this, as is used in [dylanaraps pywal utility](https://github.com/dylanaraps/pywal), is to put the following line in your `.bashrc`, `.zshrc`, etc:
+
+`(cat ~/.cache/xcolor/xcolor.sequence &)`
 
 ## How do I get it?
 
@@ -44,3 +58,16 @@ Xcolor currently comes with 3 colorschemes pre-installed:
 - Seoul256
 
 More will be coming in the future, but if you want to make your own in the meantime, make a copy of the template (located at `themes/template`) and edit the hex color values to your liking. When you're finished, just copy it to `$XDG_CONFIG_HOME/xcolor/` and you're good to go!
+
+## WM, DE, and Bar Configurations
+
+<sup>1</sup>Use the following for your polybar color configurations:
+
+`${xrdb:COLOR-NUM:FALLBACK-COLOR}` e.g. `foreground = ${xrdb:color15:#ffffff}`
+
+<sup>2</sup>i3 allows you to bring colors from your `.Xresources` with the `set_from_resource` keyword. You can then use this color for whatever you want in i3. The general format is `set_from_resource $name_for_i3 color_num backup_color`. For example, to set the focused window borders to bold yellow you could do the following:
+
+```
+set_from_resource $yellow_b color11 #ffffff
+client.focused $yellow_b $yellow_b $yellow_b $yellow_b
+```
