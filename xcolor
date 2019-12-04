@@ -2,8 +2,8 @@
 
 set -eCu
 
-SHORTOPTS="hlt:"
-LONGOPTS="help,list,theme:"
+SHORTOPTS="hlct:"
+LONGOPTS="help,list,current,theme:"
 
 CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
 CACHEDIR="$XDG_CACHE_HOME/xcolor"
@@ -14,6 +14,30 @@ THEMESDIR="$CONFIGDIR/themes"
 
 XRESPATH="$HOME/.Xresources"
 XRESINCL="#include \"$CONFIGDIR/x.colors\""
+
+XRESDEFS="
+! xcolors
+
+*.foreground:    FOREGROUND
+*.background:    BACKGROUND
+*.cursorColor:   CURSOR
+
+*.color0:        COLOR0
+*.color1:        COLOR1
+*.color2:        COLOR2
+*.color3:        COLOR3
+*.color4:        COLOR4
+*.color5:        COLOR5
+*.color6:        COLOR6
+*.color7:        COLOR7
+*.color8:        COLOR8
+*.color9:        COLOR9
+*.color10:       COLOR10
+*.color11:       COLOR11
+*.color12:       COLOR12
+*.color13:       COLOR13
+*.color14:       COLOR14
+*.color15:       COLOR15"
 
 check_config_dir() {
     if ! [ -d $CONFIGDIR ]; then
@@ -33,9 +57,10 @@ check_cache_dir() {
 
 usage() {
     echo "Usage: ./xcolor-load [options]"
-    echo "       -t, --theme:   select theme"
-    echo "       -l, --list:    list themes"
-    echo "       -h, --help:    show usage"
+    echo "       -t, --theme:    select theme"
+    echo "       -l, --list:     list themes"
+    # echo "       -c, --current:  display current theme"
+    echo "       -h, --help:     show usage"
     exit 0
 }
 
@@ -47,6 +72,11 @@ list_themes() {
             echo "$theme" | sed 's@.*/@@' | sed 's@\..*@@'
         done
     fi
+    exit 0
+}
+
+disp_curr_theme() {
+    echo "$(sed --posix 's/^.*: //' $CONFIGDIR/x.colors | head -1)"
     exit 0
 }
 
@@ -78,6 +108,9 @@ parse_args() {
             -l | --list)
                 list_themes
                 ;;
+            # -c | --current)
+            #     disp_curr_theme
+            #     ;;
             -t | --theme)
                 THEME="$2"
                 shift 2
@@ -150,16 +183,21 @@ update_tty() {
 check_xres() {
     # Create .Xresources if not already there
     if ! [ -f $XRESPATH ]; then
-        echo "$XRESINCL" > $XRESPATH
-        # TODO: Add .*colors setup to xres
-    else
-        # Add x.colors include path if not already there
-        ! grep "$XRESINCL" $XRESPATH > /dev/null
-        if [ "${PIPESTATUS[0]}" -ne "0" ]; then
-            # TODO: Check return value of tmp file creation
-            echo "$XRESINCL" | cat - $XRESPATH > /tmp/xres-tmp
-            mv /tmp/xres-tmp $XRESPATH
-        fi
+        touch $XRESPATH
+    fi
+
+    # Add x.colors include path if not already there
+    ! grep "$XRESINCL" $XRESPATH > /dev/null
+    if [ "${PIPESTATUS[0]}" -ne "0" ]; then
+        # TODO: Check return value of tmp file creation
+        echo "$XRESINCL" | cat - $XRESPATH > /tmp/xres-tmp
+        mv /tmp/xres-tmp $XRESPATH
+    fi
+
+    # Add xcolor defines if not already there
+    ! grep "*.color[0-9]\+:\s\+COLOR[0-9]\+" $XRESPATH > /dev/null
+    if [ "${PIPESTATUS[0]}" -ne "0" ]; then
+        echo "$XRESDEFS" >> $XRESPATH
     fi
 }
 

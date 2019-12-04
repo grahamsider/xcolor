@@ -9,6 +9,5 @@ if ! [ -d $CONFIGDIR ]; then
 fi
 
 cp -r themes/ $CONFIGDIR
-cat xres.defs >> $HOME/.Xresources
 
 exit 0
