@@ -5,18 +5,20 @@ set -eCu
 SHORTOPTS="hlt:"
 LONGOPTS="help,list,theme:"
 
-THEME=""
-THEMEPATH=""
-
-XRESPATH="$HOME/.Xresources"
-XRESINCL=""
-
 CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
 CACHEDIR="$XDG_CACHE_HOME/xcolor"
+
+THEME=""
+THEMEPATH=""
+THEMESDIR="$CONFIGDIR/themes"
+
+XRESPATH="$HOME/.Xresources"
+XRESINCL="#include \"$CONFIGDIR/x.colors\""
 
 check_config_dir() {
     if ! [ -d $CONFIGDIR ]; then
         mkdir $CONFIGDIR
+        mkdir $THEMESDIR
     fi
 }
 
@@ -38,10 +40,10 @@ usage() {
 }
 
 list_themes() {
-    if ! [ "$(ls -A $CONFIGDIR)" ]; then
+    if ! [ "$(ls -A $THEMESDIR)" ]; then
         echo "no themes installed!"
     else
-        for theme in $CONFIGDIR/*.colors; do
+        for theme in $THEMESDIR/*.colors; do
             echo "$theme" | sed 's@.*/@@' | sed 's@\..*@@'
         done
     fi
@@ -91,8 +93,7 @@ parse_args() {
          esac
     done
 
-    THEMEPATH="$CONFIGDIR/$THEME.colors"
-    XRESINCL="#include \"$THEMEPATH\""
+    THEMEPATH="$THEMESDIR/$THEME.colors"
 
     # Post processing
     if     [ -z "$THEME" ]; then
@@ -146,21 +147,26 @@ update_tty() {
     done
 }
 
-edit_xres() {
+check_xres() {
     # Create .Xresources if not already there
     if ! [ -f $XRESPATH ]; then
         echo "$XRESINCL" > $XRESPATH
-    # If there, add/change xcolor include path to theme
+        # TODO: Add .*colors setup to xres
     else
-        ! grep "#include" $XRESPATH | grep "xcolor" > /dev/null
+        # Add x.colors include path if not already there
+        ! grep "$XRESINCL" $XRESPATH > /dev/null
         if [ "${PIPESTATUS[0]}" -ne "0" ]; then
-            # TODO: Check disk space before tmp file creation
+            # TODO: Check return value of tmp file creation
             echo "$XRESINCL" | cat - $XRESPATH > /tmp/xres-tmp
             mv /tmp/xres-tmp $XRESPATH
-        else
-            sed -i "s/\/xcolor\/[a-zA-Z0-9_-]\+\.colors/\/xcolor\/$THEME\.colors/g" $XRESPATH
         fi
     fi
+}
+
+copy_theme() {
+    rm -f $CONFIGDIR/x.colors
+    printf "! Current xcolor theme: $THEME\n\n" > $CONFIGDIR/x.colors
+    cat $THEMEPATH >> $CONFIGDIR/x.colors
 }
 
 rel_xres() {
@@ -186,7 +192,8 @@ check_config_dir
 parse_args "$@"
 
 # Mandatory reloads
-edit_xres
+check_xres
+copy_theme
 rel_xres
 
 # If PID exists, reload
