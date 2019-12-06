@@ -5,15 +5,24 @@ set -eCu
 # Force grep to be POSIX compliant
 POSIXLY_CORRECT=1
 
-SHORTOPTS="hlcrt:"
-LONGOPTS="help,list,current,random,theme:"
+SHORTOPTS="hlcrsft:"
+LONGOPTS="help,list,current,random,save,favorites,theme:"
 
 CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
 CACHEDIR="$XDG_CACHE_HOME/xcolor"
 
 THEME=""
+CURRTHEME=""
 THEMEPATH=""
 THEMESDIR="$CONFIGDIR/themes"
+
+FAVPATH="$CONFIGDIR/favorites"
+
+ARG_LIST=0
+ARG_CURR=0
+ARG_RAND=0
+ARG_SAVE=0
+ARG_FAV=0
 
 XRESPATH="$HOME/.Xresources"
 XRESINCL="#include \"$CONFIGDIR/x.colors\""
@@ -43,8 +52,9 @@ XRESDEFS="
 *.color15:       COLOR15"
 
 check_config_dir() {
-    if ! [ -d $CONFIGDIR ]; then
-        mkdir $CONFIGDIR
+    if   ! [ -d $CONFIGDIR ]; then
+        mkdir -p $THEMESDIR
+    elif ! [ -d $THEMESDIR ]; then
         mkdir $THEMESDIR
     fi
 }
@@ -60,34 +70,58 @@ check_cache_dir() {
 
 usage() {
     echo "Usage: ./xcolor-load [options]"
-    echo "       -t, --theme:    select theme"
-    echo "       -r, --random:   select random theme"
-    echo "       -l, --list:     list themes"
-    echo "       -c, --current:  display current theme"
-    echo "       -h, --help:     show usage"
-    exit 0
+    echo "       -t, --theme:      select theme"
+    echo "       -r, --random:     select random theme"
+    echo "       -l, --list:       list themes"
+    echo "       -c, --current:    display current theme"
+    echo "       -s, --save:       save theme to favorites"
+    echo "       -f, --favorites:  use favorite themes for query"
+    echo "       -h, --help:       show usage"
 }
 
 list_themes() {
-    if ! [ "$(ls -A $THEMESDIR)" ]; then
-        echo "no themes installed!"
+    if [ "$ARG_FAV" -eq "0" ]; then
+        if ! [ "$(ls -A $THEMESDIR)" ]; then
+            echo "no themes installed!"
+        else
+            ls -1 $THEMESDIR | sed --posix 's/.colors//'
+        fi
     else
-        ls -1 $THEMESDIR | sed --posix 's/.colors//'
+        if [ -f $FAVPATH ]; then
+            cat $FAVPATH
+        fi
     fi
-    exit 0
 }
 
 rand_theme() {
     # TODO: Don't parse `ls`
-    NUMTHEMES=$(ls $THEMESDIR -1 | wc -l)
-    RAND=$(awk -v min=1 -v max=$NUMTHEMES 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
-    THEME=$(ls $THEMESDIR | sed --posix -n $RAND\p | sed --posix 's/.colors//')
+    if [ "$ARG_FAV" -eq "0" ]; then
+        NUMTHEMES=$(ls $THEMESDIR -1 | wc -l)
+        RAND=$(awk -v min=1 -v max=$NUMTHEMES 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+        THEME=$(ls $THEMESDIR | sed --posix -n $RAND\p | sed --posix 's/.colors//')
+    else
+        NUMTHEMES=$(cat $FAVPATH | wc -l)
+        RAND=$(awk -v min=1 -v max=$NUMTHEMES 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+        THEME=$(cat $FAVPATH | sed --posix -n $RAND\p)
+    fi
+
     echo "theme selected: $THEME"
 }
 
-disp_curr_theme() {
-    echo "$(grep "!" $CONFIGDIR/x.colors | sed --posix 's/^.*: //')"
-    exit 0
+# Change to get_curr_theme
+get_curr_theme() {
+    CURRTHEME="$(grep "!" $CONFIGDIR/x.colors | sed --posix 's/^.*: //')" > /dev/null
+}
+
+save_theme() {
+    get_curr_theme
+    ! grep -w "^$CURRTHEME$" $FAVPATH > /dev/null
+    if [ "${PIPESTATUS[0]}" -eq "0" ]; then
+        echo "error: $CURRTHEME already in favorites"
+        exit 1
+    fi
+    echo $CURRTHEME >> $FAVPATH
+    echo "$CURRTHEME added to favorites"
 }
 
 parse_args() {
@@ -114,15 +148,26 @@ parse_args() {
         case "$1" in
             -h | --help)
                 usage
+                exit 0
                 ;;
             -l | --list)
-                list_themes
+                ARG_LIST=1
+                shift
                 ;;
             -c | --current)
-                disp_curr_theme
+                ARG_CURR=1
+                shift
                 ;;
             -r | --random)
-                rand_theme
+                ARG_RAND=1
+                shift
+                ;;
+            -s | --save)
+                ARG_SAVE=1
+                shift
+                ;;
+            -f | --favorites)
+                ARG_FAV=1
                 shift
                 ;;
             -t | --theme)
@@ -139,10 +184,27 @@ parse_args() {
                 ;;
          esac
     done
+}
 
+exec_args() {
+    if   [ "$ARG_SAVE" -eq 1 ]; then
+        save_theme
+        exit 0
+    elif [ "$ARG_CURR" -eq 1 ]; then
+        get_curr_theme
+        echo $CURRTHEME
+        exit 0
+    elif [ "$ARG_LIST" -eq 1 ]; then
+        list_themes
+        exit 0
+    elif [ "$ARG_RAND" -eq 1 ]; then
+        rand_theme
+    fi
+}
+
+check_theme() {
     THEMEPATH="$THEMESDIR/$THEME.colors"
 
-    # Post processing
     if     [ -z "$THEME" ]; then
         echo "error: please select theme"
         exit 1
@@ -150,7 +212,6 @@ parse_args() {
         echo "error: $THEMEPATH does not exist"
         exit 1
     fi
-
 }
 
 read_theme() {
@@ -240,8 +301,11 @@ rel_if_alive() {
     fi
 }
 
+# Assemble and execute args
 check_config_dir
 parse_args "$@"
+exec_args
+check_theme
 
 # Mandatory reloads
 check_xres
@@ -252,6 +316,7 @@ rel_xres
 rel_if_alive "i3"
 rel_if_alive "polybar"
 
+# Update current TTYs
 read_theme
 check_cache_dir
 make_esc_seq
