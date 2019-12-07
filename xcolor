@@ -5,8 +5,8 @@ set -eCu
 # Force grep to be POSIX compliant
 POSIXLY_CORRECT=1
 
-SHORTOPTS="hlcrsft:"
-LONGOPTS="help,list,current,random,save,favorites,theme:"
+SHORTOPTS="hlcrsdft:"
+LONGOPTS="help,list,current,random,save,delete,favorites,theme:"
 
 CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
 CACHEDIR="$XDG_CACHE_HOME/xcolor"
@@ -22,6 +22,7 @@ ARG_LIST=0
 ARG_CURR=0
 ARG_RAND=0
 ARG_SAVE=0
+ARG_DEL=0
 ARG_FAV=0
 
 XRESPATH="$HOME/.Xresources"
@@ -75,6 +76,7 @@ usage() {
     echo "       -l, --list:       list themes"
     echo "       -c, --current:    display current theme"
     echo "       -s, --save:       save theme to favorites"
+    echo "       -d, --delete:     delete theme to favorites"
     echo "       -f, --favorites:  use favorite themes for query"
     echo "       -h, --help:       show usage"
 }
@@ -124,6 +126,23 @@ save_theme() {
     echo "$CURRTHEME added to favorites"
 }
 
+del_theme() {
+    if ! [ -f $FAVPATH ]; then
+        echo "error: $CURRTHEME is not in favorites"
+        exit 1
+    fi
+    get_curr_theme
+    ! grep -w "^$CURRTHEME$" $FAVPATH > /dev/null
+    if [ "${PIPESTATUS[0]}" -ne "0" ]; then
+        echo "error: $CURRTHEME is not in favorites"
+        exit 1
+    fi
+    sed "/^$CURRTHEME$/d" $FAVPATH > /tmp/xcolor.favorites
+    rm -f $FAVPATH
+    mv /tmp/xcolor.favorites $FAVPATH
+    echo "$CURRTHEME deleted from favorites"
+}
+
 parse_args() {
     # Check getopt(1) version
     ! getopt --test > /dev/null
@@ -166,6 +185,10 @@ parse_args() {
                 ARG_SAVE=1
                 shift
                 ;;
+            -d | --delete)
+                ARG_DEL=1
+                shift
+                ;;
             -f | --favorites)
                 ARG_FAV=1
                 shift
@@ -189,6 +212,9 @@ parse_args() {
 exec_args() {
     if   [ "$ARG_SAVE" -eq 1 ]; then
         save_theme
+        exit 0
+    elif [ "$ARG_DEL" -eq 1 ]; then
+        del_theme
         exit 0
     elif [ "$ARG_CURR" -eq 1 ]; then
         get_curr_theme
