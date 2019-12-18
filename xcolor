@@ -1,22 +1,19 @@
-#!/bin/bash
+#!/bin/sh
 
 set -eCu
 
-# Force grep to be POSIX compliant
-POSIXLY_CORRECT=1
-
-SHORTOPTS="hlcrsdft:"
-LONGOPTS="help,list,current,random,save,delete,favorites,theme:"
+OPTS=":hlcrfs:d:t:"
 
 CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
 CACHEDIR="$XDG_CACHE_HOME/xcolor"
 
 THEME=""
+SAVE_DEL_THEME=""
 CURRTHEME=""
 THEMEPATH=""
 THEMESDIR="$CONFIGDIR/themes"
 
-FAVPATH="$CONFIGDIR/favorites"
+FAVPATH="$CONFIGDIR/xcolor.favorites"
 
 ARG_LIST=0
 ARG_CURR=0
@@ -53,58 +50,57 @@ XRESDEFS="
 *.color15:       COLOR15"
 
 check_config_dir() {
-    if   ! [ -d $CONFIGDIR ]; then
-        mkdir -p $THEMESDIR
-    elif ! [ -d $THEMESDIR ]; then
-        mkdir $THEMESDIR
+    if   ! [  -d "$CONFIGDIR" ]; then
+        mkdir -p "$THEMESDIR"
+    elif ! [  -d "$THEMESDIR" ]; then
+        mkdir -p "$THEMESDIR"
     fi
 }
 
 check_cache_dir() {
-    if ! [ -d $CACHEDIR ]; then
-        mkdir $CACHEDIR
+    if ! [ -d "$CACHEDIR" ]; then
+        mkdir "$CACHEDIR"
     fi
-    if [ -f $CACHEDIR/xcolor.sequence ]; then
-        rm -f $CACHEDIR/xcolor.sequence
+    if   [ -f "$CACHEDIR"/xcolor.sequence ]; then
+        rm -f "$CACHEDIR"/xcolor.sequence
     fi
 }
 
 usage() {
-    echo "Usage: ./xcolor-load [options]"
-    echo "       -t, --theme:      select theme"
-    echo "       -r, --random:     select random theme"
-    echo "       -l, --list:       list themes"
-    echo "       -c, --current:    display current theme"
-    echo "       -s, --save:       save theme to favorites"
-    echo "       -d, --delete:     delete theme to favorites"
-    echo "       -f, --favorites:  use favorite themes for query"
-    echo "       -h, --help:       show usage"
+    echo "Usage: ./xcolor [options]"
+    echo "       -t (theme):      select theme"
+    echo "       -r (random):     select random theme"
+    echo "       -l (list):       list themes"
+    echo "       -c (current):    display current theme"
+    echo "       -s (save):       save theme to favorites"
+    echo "       -d (delete):     delete theme to favorites"
+    echo "       -f (favorites):  use favorite themes for query"
+    echo "       -h (help):       show usage"
 }
 
 list_themes() {
     if [ "$ARG_FAV" -eq "0" ]; then
-        if ! [ "$(ls -A $THEMESDIR)" ]; then
+        if ! [ "$(find "$THEMESDIR" -name "*.colors" -type f)" ]; then
             echo "no themes installed!"
         else
-            ls -1 $THEMESDIR | sed --posix 's/.colors//'
+            find "$THEMESDIR" -name "*.colors" -type f | sed "s/^.*\///; s/.colors//"
         fi
     else
-        if [ -f $FAVPATH ]; then
-            cat $FAVPATH
+        if [ -f "$FAVPATH" ]; then
+            cat "$FAVPATH"
         fi
     fi
 }
 
 rand_theme() {
-    # TODO: Don't parse `ls`
     if [ "$ARG_FAV" -eq "0" ]; then
-        NUMTHEMES=$(ls $THEMESDIR -1 | wc -l)
-        RAND=$(awk -v min=1 -v max=$NUMTHEMES 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
-        THEME=$(ls $THEMESDIR | sed --posix -n $RAND\p | sed --posix 's/.colors//')
+        NUMTHEMES=$(find "$THEMESDIR" -name "*.colors" -type f | wc -l)
+        RAND=$(awk -v min="1" -v max="$NUMTHEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+        THEME=$(find "$THEMESDIR" -name "*.colors" -type f | sed -n "$RAND"p | sed "s/^.*\///; s/.colors//")
     else
-        NUMTHEMES=$(cat $FAVPATH | wc -l)
-        RAND=$(awk -v min=1 -v max=$NUMTHEMES 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
-        THEME=$(cat $FAVPATH | sed --posix -n $RAND\p)
+        NUMTHEMES=$(wc -l < "$FAVPATH")
+        RAND=$(awk -v min=1 -v max="$NUMTHEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+        THEME=$(sed -n "$RAND"p "$FAVPATH")
     fi
 
     echo "theme selected: $THEME"
@@ -112,101 +108,110 @@ rand_theme() {
 
 # Change to get_curr_theme
 get_curr_theme() {
-    CURRTHEME="$(grep "!" $CONFIGDIR/x.colors | sed --posix 's/^.*: //')" > /dev/null
+    CURRTHEME=$(grep "!" "$CONFIGDIR"/x.colors | sed "s/^.*: //") > /dev/null
+}
+
+check_save_del_arg() {
+    # Check if argument was given
+    if [ -z "$SAVE_DEL_THEME" ]; then
+        get_curr_theme
+        SAVE_DEL_THEME="$CURRTHEME"
+    fi
+
+    # Check if theme exists
+    check_theme "$SAVE_DEL_THEME"
 }
 
 save_theme() {
-    get_curr_theme
-    ! grep -w "^$CURRTHEME$" $FAVPATH > /dev/null
-    if [ "${PIPESTATUS[0]}" -eq "0" ]; then
-        echo "error: $CURRTHEME already in favorites"
+    check_save_del_arg
+
+    # Check if theme is in favorites
+    ! grep "^$SAVE_DEL_THEME$" "$FAVPATH" > /dev/null
+    if [ "$?" -eq "1" ]; then
+        echo "error: $SAVE_DEL_THEME already in favorites"
         exit 1
     fi
-    echo $CURRTHEME >> $FAVPATH
-    echo "$CURRTHEME added to favorites"
+
+    # Add theme to favorites
+    echo "$SAVE_DEL_THEME" >> "$FAVPATH"
+    echo "$SAVE_DEL_THEME added to favorites"
 }
 
 del_theme() {
-    if ! [ -f $FAVPATH ]; then
-        echo "error: $CURRTHEME is not in favorites"
+    check_save_del_arg
+
+    # Check if xcolor.favorites exists
+    if ! [ -f "$FAVPATH" ]; then
+        echo "error: $SAVE_DEL_THEME is not in favorites"
         exit 1
     fi
-    get_curr_theme
-    ! grep -w "^$CURRTHEME$" $FAVPATH > /dev/null
-    if [ "${PIPESTATUS[0]}" -ne "0" ]; then
-        echo "error: $CURRTHEME is not in favorites"
+
+    # Check if theme is in favorites
+    ! grep -w "^$SAVE_DEL_THEME$" "$FAVPATH" > /dev/null
+    if [ "$?" -ne "1" ]; then
+        echo "error: $SAVE_DEL_THEME is not in favorites"
         exit 1
     fi
-    sed "/^$CURRTHEME$/d" $FAVPATH > /tmp/xcolor.favorites
-    rm -f $FAVPATH
-    mv /tmp/xcolor.favorites $FAVPATH
-    echo "$CURRTHEME deleted from favorites"
+
+    # Remove theme from favorites
+    sed "/^$SAVE_DEL_THEME$/d" "$FAVPATH" > /tmp/xcolor.favorites
+    rm -f "$FAVPATH"
+    mv /tmp/xcolor.favorites "$FAVPATH"
+    echo "$SAVE_DEL_THEME deleted from favorites"
 }
 
 parse_args() {
-    # Check getopt(1) version
-    ! getopt --test > /dev/null
-    if [ "${PIPESTATUS[0]}" -ne "4" ]; then
-        echo "error: incompatible getopt version -- please install enhanced getopt"
-        exit 2
-    fi
-
-    # Assemble options
-    ! OPTS=$(getopt --options $SHORTOPTS --long $LONGOPTS --name "$0" -- "$@")
-    if [ "${PIPESTATUS[0]}" -ne "0" ]; then
-        exit 2
-    fi
-    eval "set -- $OPTS"
-
-    if [ "$1" == "--" ]; then
-        usage
-    fi
-
     # Parse loop
-    while true; do
-        case "$1" in
-            -h | --help)
+    while getopts "$OPTS" opt; do
+        case "$opt" in
+            h )
                 usage
                 exit 0
                 ;;
-            -l | --list)
+            l )
                 ARG_LIST=1
-                shift
                 ;;
-            -c | --current)
+            c )
                 ARG_CURR=1
-                shift
                 ;;
-            -r | --random)
+            r )
                 ARG_RAND=1
-                shift
                 ;;
-            -s | --save)
-                ARG_SAVE=1
-                shift
-                ;;
-            -d | --delete)
-                ARG_DEL=1
-                shift
-                ;;
-            -f | --favorites)
+            f )
                 ARG_FAV=1
-                shift
                 ;;
-            -t | --theme)
-                THEME="$2"
-                shift 2
+            s )
+                ARG_SAVE=1
+                SAVE_DEL_THEME="$OPTARG"
                 ;;
-            --)
-                shift
-                break
+            d )
+                ARG_DEL=1
+                SAVE_DEL_THEME="$OPTARG"
                 ;;
-            *)
-                echo "*"
+            t )
+                THEME="$OPTARG"
+                ;;
+            \? )
+                usage
                 exit 2
+                ;;
+            : )
+                case "$OPTARG" in
+                    t )
+                        echo "error: please select theme"
+                        exit 1
+                        ;;
+                    s )
+                        ARG_SAVE=1
+                        ;;
+                    d )
+                        ARG_DEL=1
+                        ;;
+                esac
                 ;;
          esac
     done
+    shift $((OPTIND - 1));
 }
 
 exec_args() {
@@ -218,7 +223,7 @@ exec_args() {
         exit 0
     elif [ "$ARG_CURR" -eq 1 ]; then
         get_curr_theme
-        echo $CURRTHEME
+        echo "$CURRTHEME"
         exit 0
     elif [ "$ARG_LIST" -eq 1 ]; then
         list_themes
@@ -229,26 +234,24 @@ exec_args() {
 }
 
 check_theme() {
-    THEMEPATH="$THEMESDIR/$THEME.colors"
+    THEMEPATH="$THEMESDIR/$*.colors"
 
-    if     [ -z "$THEME" ]; then
-        echo "error: please select theme"
-        exit 1
-    elif ! [ -f "$THEMEPATH" ]; then
-        echo "error: $THEMEPATH does not exist"
+    if ! [ -f "$THEMEPATH" ]; then
+        echo "error: $*.colors does not exist"
         exit 1
     fi
 }
 
 read_theme() {
+    # Word splitting on the set
+    # command here is intentional
     while read -r LINE; do
-        set -- $LINE
-        printf -v $2 "$3"
-    done < $THEMEPATH
+        eval "$(echo "$LINE" | sed "s/\#define\s\+//; s/\s.*$//")"="$(echo "$LINE" | sed "s/^.*\s//")"
+    done < "$THEMEPATH"
 }
 
 make_esc_seq() {
-    echo -e "\
+    echo "\
 ]4;0;$COLOR0\\\
 ]4;1;$COLOR1\\\
 ]4;2;$COLOR2\\\
@@ -270,46 +273,46 @@ make_esc_seq() {
 ]12;$CURSOR\\\
 ]4;232;$BACKGROUND\\\
 ]4;256;$BACKGROUND\\\
-]708;$BACKGROUND\\" > $CACHEDIR/xcolor.sequence
+]708;$BACKGROUND\\" > "$CACHEDIR"/xcolor.sequence
 }
 
 update_tty() {
     for tty in /dev/pts/[0-9]*; do
-        if [ -w $tty ]; then
-            cat $CACHEDIR/xcolor.sequence | tr -d "\n" > $tty &
+        if [ -w "$tty" ]; then
+            tr -d "\n" < "$CACHEDIR"/xcolor.sequence > "$tty" &
         fi
     done
 }
 
 check_xres() {
     # Create .Xresources if not already there
-    if ! [ -f $XRESPATH ]; then
-        touch $XRESPATH
+    if ! [ -f "$XRESPATH" ]; then
+        touch "$XRESPATH"
     fi
 
     # Add x.colors include path to xres if not already there
-    ! grep "$XRESINCL" $XRESPATH > /dev/null
-    if [ "${PIPESTATUS[0]}" -ne "0" ]; then
+    ! grep "$XRESINCL" "$XRESPATH" > /dev/null
+    if [ "$?" -ne "1" ]; then
         # TODO: Check return value of tmp file creation
-        echo "$XRESINCL" | cat - $XRESPATH > /tmp/xres-tmp
-        mv /tmp/xres-tmp $XRESPATH
+        echo "$XRESINCL" | cat - "$XRESPATH" > /tmp/xres-tmp
+        mv /tmp/xres-tmp "$XRESPATH"
     fi
 
     # Add xcolor defines to xres if not already there
-    ! grep "*.color[0-9]\+:\s\+COLOR[0-9]\+" $XRESPATH > /dev/null
-    if [ "${PIPESTATUS[0]}" -ne "0" ]; then
-        echo "$XRESDEFS" >> $XRESPATH
+    ! grep "\*\.color[0-9]\+:\s\+COLOR[0-9]\+" "$XRESPATH" > /dev/null
+    if [ "$?" -ne "1" ]; then
+        echo "$XRESDEFS" >> "$XRESPATH"
     fi
 }
 
 copy_theme() {
-    rm -f $CONFIGDIR/x.colors
-    printf "! Current xcolor theme: $THEME\n\n" > $CONFIGDIR/x.colors
-    cat $THEMEPATH >> $CONFIGDIR/x.colors
+    rm -f "$CONFIGDIR"/x.colors
+    printf "! Current xcolor theme: %s\n\n" "$THEME" > "$CONFIGDIR/x.colors"
+    cat "$THEMEPATH" >> "$CONFIGDIR"/x.colors
 }
 
 rel_xres() {
-    xrdb $XRESPATH > /dev/null
+    xrdb "$XRESPATH" > /dev/null
 }
 
 rel_i3() {
@@ -321,9 +324,9 @@ rel_polybar() {
 }
 
 rel_if_alive() {
-    ! pgrep $@ > /dev/null
-    if [ "${PIPESTATUS[0]}" -eq "0" ]; then
-        rel_$@
+    ! pgrep "$*" > /dev/null
+    if [ "$?" -eq "1" ]; then
+        rel_"$*"
     fi
 }
 
@@ -331,7 +334,7 @@ rel_if_alive() {
 check_config_dir
 parse_args "$@"
 exec_args
-check_theme
+check_theme "$THEME"
 
 # Mandatory reloads
 check_xres
