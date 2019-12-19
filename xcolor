@@ -4,6 +4,9 @@ set -eCu
 
 OPTS=":hlcrfs:d:t:"
 
+XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
+XDG_CACHE_HOME=${XDG_CACHE_HOME:-"$HOME/.cache"}
+
 CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
 CACHEDIR="$XDG_CACHE_HOME/xcolor"
 
@@ -164,34 +167,30 @@ parse_args() {
     # Parse loop
     while getopts "$OPTS" opt; do
         case "$opt" in
-            h )
-                usage
-                exit 0
-                ;;
-            l )
+            l)
                 ARG_LIST=1
                 ;;
-            c )
+            c)
                 ARG_CURR=1
                 ;;
-            r )
+            r)
                 ARG_RAND=1
                 ;;
-            f )
+            f)
                 ARG_FAV=1
                 ;;
-            s )
+            s)
                 ARG_SAVE=1
                 SAVE_DEL_THEME="$OPTARG"
                 ;;
-            d )
+            d)
                 ARG_DEL=1
                 SAVE_DEL_THEME="$OPTARG"
                 ;;
-            t )
+            t)
                 THEME="$OPTARG"
                 ;;
-            \? )
+            \?|h)
                 usage
                 exit 2
                 ;;
@@ -211,6 +210,7 @@ parse_args() {
                 ;;
          esac
     done
+    [ "$OPTIND" -eq "1" ] && usage && exit 0
     shift $((OPTIND - 1));
 }
 
