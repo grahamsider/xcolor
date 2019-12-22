@@ -5,10 +5,9 @@ set -e
 CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
 
 if ! [ -d $CONFIGDIR ]; then
-    mkdir $CONFIGDIR
+    mkdir -p $CONFIGDIR
 fi
 
-cp themes/*.colors $CONFIGDIR/
-cat xres.defs >> $HOME/.Xresources
+cp -r themes/ $CONFIGDIR
 
 exit 0
