@@ -10,6 +10,10 @@ XDG_CACHE_HOME=${XDG_CACHE_HOME:-"$HOME/.cache"}
 CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
 CACHEDIR="$XDG_CACHE_HOME/xcolor"
 
+# Set this to hardcode a cpp preprocessor path for xrdb merge
+# (ie xrdb -merge -cpp $XRDB_CPP ...)
+XRDB_CPP=${XRDB_CPP:-""}
+
 THEME=""
 SAVE_DEL_THEME=""
 CURRTHEME=""
@@ -96,15 +100,19 @@ list_themes() {
 }
 
 rand_theme() {
-    if [ "$ARG_FAV" -eq "0" ]; then
-        NUMTHEMES=$(find "$THEMESDIR" -name "*.colors" -type f | wc -l)
-        RAND=$(awk -v min="1" -v max="$NUMTHEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
-        THEME=$(find "$THEMESDIR" -name "*.colors" -type f | sed -n "$RAND"p | sed "s/^.*\///; s/.colors//")
-    else
-        NUMTHEMES=$(wc -l < "$FAVPATH")
-        RAND=$(awk -v min=1 -v max="$NUMTHEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
-        THEME=$(sed -n "$RAND"p "$FAVPATH")
-    fi
+    while true; do
+        if [ "$ARG_FAV" -eq "0" ]; then
+            NUMTHEMES=$(find "$THEMESDIR" -name "*.colors" -type f | wc -l)
+            RAND=$(awk -v min="1" -v max="$NUMTHEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+            THEME=$(find "$THEMESDIR" -name "*.colors" -type f | sed -n "$RAND"p | sed "s/^.*\///; s/.colors//")
+            [ "$THEME" != "$CURRTHEME" ] && break
+        else
+            NUMTHEMES=$(wc -l < "$FAVPATH")
+            RAND=$(awk -v min=1 -v max="$NUMTHEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+            THEME=$(sed -n "$RAND"p "$FAVPATH")
+            [ "$THEME" != "$CURRTHEME" ] && break
+        fi
+    done
 
     echo "theme selected: $THEME"
 }
@@ -229,6 +237,7 @@ exec_args() {
         list_themes
         exit 0
     elif [ "$ARG_RAND" -eq 1 ]; then
+        get_curr_theme
         rand_theme
     fi
 }
@@ -251,7 +260,7 @@ read_theme() {
 }
 
 make_esc_seq() {
-    echo "\
+    echo -ne "\
 ]4;0;$COLOR0\\\
 ]4;1;$COLOR1\\\
 ]4;2;$COLOR2\\\
@@ -279,7 +288,7 @@ make_esc_seq() {
 update_tty() {
     for tty in /dev/pts/[0-9]*; do
         if [ -w "$tty" ]; then
-            tr -d "\n" < "$CACHEDIR"/xcolor.sequence > "$tty" &
+            cat "$CACHEDIR"/xcolor.sequence > "$tty" &
         fi
     done
 }
@@ -312,7 +321,11 @@ copy_theme() {
 }
 
 rel_xres() {
-    xrdb "$XRESPATH" > /dev/null
+    if [ -z "$XRDB_CPP" ]; then
+        xrdb -merge "$XRESPATH" > /dev/null
+    else
+        xrdb -merge -cpp "${XRDB_CPP:-"default"}" "$XRESPATH" > /dev/null
+    fi
 }
 
 rel_i3() {
