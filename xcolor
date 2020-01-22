@@ -2,25 +2,31 @@
 
 set -eCu
 
-OPTS=":hlcrfs:d:t:"
+VERSION="0.4.2"
+
+OPTS=":hvlcrfs:d:t:"
 
 XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-"$HOME/.config"}
 XDG_CACHE_HOME=${XDG_CACHE_HOME:-"$HOME/.cache"}
 
-CONFIGDIR="$XDG_CONFIG_HOME/xcolor"
-CACHEDIR="$XDG_CACHE_HOME/xcolor"
+CONFIG_DIR="$XDG_CONFIG_HOME/xcolor"
+CACHE_DIR="$XDG_CACHE_HOME/xcolor"
 
 # Set this to hardcode a cpp preprocessor path for xrdb merge
 # (ie xrdb -merge -cpp $XRDB_CPP ...)
 XRDB_CPP=${XRDB_CPP:-""}
 
+# Process list that xcolor will attempt to reload after a
+# theme change. Will only reload if alive prior to execution
+PROC_LIST="i3 bspwm sway polybar"
+
 THEME=""
 SAVE_DEL_THEME=""
-CURRTHEME=""
-THEMEPATH=""
-THEMESDIR="$CONFIGDIR/themes"
+CURR_THEME=""
+THEME_PATH=""
+THEMES_DIR="$CONFIG_DIR/themes"
 
-FAVPATH="$CONFIGDIR/xcolor.favorites"
+FAV_PATH="$CONFIG_DIR/xcolor.favorites"
 
 ARG_LIST=0
 ARG_CURR=0
@@ -28,11 +34,12 @@ ARG_RAND=0
 ARG_SAVE=0
 ARG_DEL=0
 ARG_FAV=0
+ARG_VER=0
 
-XRESPATH="$HOME/.Xresources"
-XRESINCL="#include \"$CONFIGDIR/x.colors\""
+XRES_PATH="$HOME/.Xresources"
+XRES_INCL="#include \"$CONFIG_DIR/x.colors\""
 
-XRESDEFS="
+XRES_DEFS="
 ! xcolors
 
 *.foreground:    FOREGROUND
@@ -57,76 +64,83 @@ XRESDEFS="
 *.color15:       COLOR15"
 
 check_config_dir() {
-    if   ! [  -d "$CONFIGDIR" ]; then
-        mkdir -p "$THEMESDIR"
-    elif ! [  -d "$THEMESDIR" ]; then
-        mkdir -p "$THEMESDIR"
+    if   ! [  -d "$CONFIG_DIR" ]; then
+        mkdir -p "$THEMES_DIR"
+    elif ! [  -d "$THEMES_DIR" ]; then
+        mkdir -p "$THEMES_DIR"
     fi
 }
 
 check_cache_dir() {
-    if ! [ -d "$CACHEDIR" ]; then
-        mkdir "$CACHEDIR"
+    if ! [ -d "$CACHE_DIR" ]; then
+        mkdir "$CACHE_DIR"
     fi
-    if   [ -f "$CACHEDIR"/xcolor.sequence ]; then
-        rm -f "$CACHEDIR"/xcolor.sequence
+    if   [ -f "$CACHE_DIR"/xcolor.sequence ]; then
+        rm -f "$CACHE_DIR"/xcolor.sequence
     fi
 }
 
 usage() {
-    echo "Usage: ./xcolor [options]"
-    echo "       -t (theme):      select theme"
-    echo "       -r (random):     select random theme"
-    echo "       -l (list):       list themes"
-    echo "       -c (current):    display current theme"
-    echo "       -s (save):       save theme to favorites"
-    echo "       -d (delete):     delete theme to favorites"
-    echo "       -f (favorites):  use favorite themes for query"
-    echo "       -h (help):       show usage"
+    echo "Usage: ./xcolor [options]
+       -t (theme):      select theme
+       -r (random):     select random theme
+       -l (list):       list themes
+       -c (current):    display current theme
+       -s (save):       save theme to favorites
+       -d (delete):     delete theme to favorites
+       -f (favorites):  use favorite themes for query
+       -v (version):    show xcolor version and exit
+       -h (help):       show usage"
 }
 
 list_themes() {
     if [ "$ARG_FAV" -eq "0" ]; then
-        if ! [ "$(find "$THEMESDIR" -name "*.colors" -type f)" ]; then
+        if ! [ "$(find "$THEMES_DIR" -name "*.colors" -type f)" ]; then
             echo "no themes installed!"
         else
-            find "$THEMESDIR" -name "*.colors" -type f | sed "s/^.*\///; s/.colors//"
+            find "$THEMES_DIR" -name "*.colors" -type f | sed "s/^.*\///; s/.colors//"
         fi
     else
-        if [ -f "$FAVPATH" ]; then
-            cat "$FAVPATH"
+        if [ -f "$FAV_PATH" ]; then
+            cat "$FAV_PATH"
         fi
     fi
 }
 
 rand_theme() {
-    while true; do
-        if [ "$ARG_FAV" -eq "0" ]; then
-            NUMTHEMES=$(find "$THEMESDIR" -name "*.colors" -type f | wc -l)
-            RAND=$(awk -v min="1" -v max="$NUMTHEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
-            THEME=$(find "$THEMESDIR" -name "*.colors" -type f | sed -n "$RAND"p | sed "s/^.*\///; s/.colors//")
-            [ "$THEME" != "$CURRTHEME" ] && break
-        else
-            NUMTHEMES=$(wc -l < "$FAVPATH")
-            RAND=$(awk -v min=1 -v max="$NUMTHEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
-            THEME=$(sed -n "$RAND"p "$FAVPATH")
-            [ "$THEME" != "$CURRTHEME" ] && break
+    if [ "$ARG_FAV" -eq "0" ]; then
+        NUM_THEMES=$(find "$THEMES_DIR" -name "*.colors" -type f | wc -l)
+        RAND=$(awk -v min="1" -v max="$NUM_THEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+        THEME=$(find "$THEMES_DIR" -name "*.colors" -type f | sed -n "$RAND"p | sed "s/^.*\///; s/.colors//")
+        if [ "$THEME" = "$CURR_THEME" ]; then
+            RAND=$(((RAND + 1) % NUM_THEMES))
+            [ "$RAND" -eq "0" ] && RAND="$NUM_THEMES"
+            THEME=$(find "$THEMES_DIR" -name "*.colors" -type f | sed -n "$RAND"p | sed "s/^.*\///; s/.colors//")
         fi
-    done
+    else
+        NUM_THEMES=$(wc -l < "$FAV_PATH")
+        RAND=$(awk -v min=1 -v max="$NUM_THEMES" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+        THEME=$(sed -n "$RAND"p "$FAV_PATH")
+        if [ "$THEME" = "$CURR_THEME" ]; then
+            RAND=$(((RAND + 1) % NUM_THEMES))
+            [ "$RAND" -eq "0" ] && RAND="$NUM_THEMES"
+            THEME=$(sed -n "$RAND"p "$FAV_PATH")
+        fi
+    fi
 
     echo "theme selected: $THEME"
 }
 
 # Change to get_curr_theme
 get_curr_theme() {
-    CURRTHEME=$(grep "!" "$CONFIGDIR"/x.colors | sed "s/^.*: //") > /dev/null
+    CURR_THEME=$(grep "!" "$CONFIG_DIR"/x.colors | sed "s/^.*: //") > /dev/null
 }
 
 check_save_del_arg() {
     # Check if argument was given
     if [ -z "$SAVE_DEL_THEME" ]; then
         get_curr_theme
-        SAVE_DEL_THEME="$CURRTHEME"
+        SAVE_DEL_THEME="$CURR_THEME"
     fi
 
     # Check if theme exists
@@ -136,15 +150,18 @@ check_save_del_arg() {
 save_theme() {
     check_save_del_arg
 
+    # Check if xcolor.favorites exists
+    ! [ -f "$FAV_PATH" ] && touch "$FAV_PATH"
+
     # Check if theme is in favorites
-    ! grep "^$SAVE_DEL_THEME$" "$FAVPATH" > /dev/null
+    ! grep "^$SAVE_DEL_THEME$" "$FAV_PATH" > /dev/null
     if [ "$?" -eq "1" ]; then
         echo "error: $SAVE_DEL_THEME already in favorites"
         exit 1
     fi
 
     # Add theme to favorites
-    echo "$SAVE_DEL_THEME" >> "$FAVPATH"
+    echo "$SAVE_DEL_THEME" >> "$FAV_PATH"
     echo "$SAVE_DEL_THEME added to favorites"
 }
 
@@ -152,22 +169,22 @@ del_theme() {
     check_save_del_arg
 
     # Check if xcolor.favorites exists
-    if ! [ -f "$FAVPATH" ]; then
+    if ! [ -f "$FAV_PATH" ]; then
         echo "error: $SAVE_DEL_THEME is not in favorites"
         exit 1
     fi
 
     # Check if theme is in favorites
-    ! grep -w "^$SAVE_DEL_THEME$" "$FAVPATH" > /dev/null
+    ! grep -w "^$SAVE_DEL_THEME$" "$FAV_PATH" > /dev/null
     if [ "$?" -ne "1" ]; then
         echo "error: $SAVE_DEL_THEME is not in favorites"
         exit 1
     fi
 
     # Remove theme from favorites
-    sed "/^$SAVE_DEL_THEME$/d" "$FAVPATH" > /tmp/xcolor.favorites
-    rm -f "$FAVPATH"
-    mv /tmp/xcolor.favorites "$FAVPATH"
+    sed "/^$SAVE_DEL_THEME$/d" "$FAV_PATH" > /tmp/xcolor.favorites
+    rm -f "$FAV_PATH"
+    mv /tmp/xcolor.favorites "$FAV_PATH"
     echo "$SAVE_DEL_THEME deleted from favorites"
 }
 
@@ -186,6 +203,9 @@ parse_args() {
                 ;;
             f)
                 ARG_FAV=1
+                ;;
+            v)
+                ARG_VER=1
                 ;;
             s)
                 ARG_SAVE=1
@@ -231,10 +251,13 @@ exec_args() {
         exit 0
     elif [ "$ARG_CURR" -eq 1 ]; then
         get_curr_theme
-        echo "$CURRTHEME"
+        echo "$CURR_THEME"
         exit 0
     elif [ "$ARG_LIST" -eq 1 ]; then
         list_themes
+        exit 0
+    elif [ "$ARG_VER"  -eq 1 ]; then
+        echo "xcolor $VERSION"
         exit 0
     elif [ "$ARG_RAND" -eq 1 ]; then
         get_curr_theme
@@ -243,9 +266,9 @@ exec_args() {
 }
 
 check_theme() {
-    THEMEPATH="$THEMESDIR/$*.colors"
+    THEME_PATH="$THEMES_DIR/$*.colors"
 
-    if ! [ -f "$THEMEPATH" ]; then
+    if ! [ -f "$THEME_PATH" ]; then
         echo "error: $*.colors does not exist"
         exit 1
     fi
@@ -256,11 +279,11 @@ read_theme() {
     # command here is intentional
     while read -r LINE; do
         eval "$(echo "$LINE" | sed "s/\#define\s\+//; s/\s.*$//")"="$(echo "$LINE" | sed "s/^.*\s//")"
-    done < "$THEMEPATH"
+    done < "$THEME_PATH"
 }
 
 make_esc_seq() {
-    echo -ne "\
+    echo "\
 ]4;0;$COLOR0\\\
 ]4;1;$COLOR1\\\
 ]4;2;$COLOR2\\\
@@ -282,58 +305,68 @@ make_esc_seq() {
 ]12;$CURSOR\\\
 ]4;232;$BACKGROUND\\\
 ]4;256;$BACKGROUND\\\
-]708;$BACKGROUND\\" > "$CACHEDIR"/xcolor.sequence
-}
-
-update_tty() {
-    for tty in /dev/pts/[0-9]*; do
-        if [ -w "$tty" ]; then
-            cat "$CACHEDIR"/xcolor.sequence > "$tty" &
-        fi
-    done
+]708;$BACKGROUND\\" > "$CACHE_DIR"/xcolor.sequence
 }
 
 check_xres() {
     # Create .Xresources if not already there
-    if ! [ -f "$XRESPATH" ]; then
-        touch "$XRESPATH"
+    if ! [ -f "$XRES_PATH" ]; then
+        touch "$XRES_PATH"
     fi
 
     # Add x.colors include path to xres if not already there
-    ! grep "$XRESINCL" "$XRESPATH" > /dev/null
+    ! grep "$XRES_INCL" "$XRES_PATH" > /dev/null
     if [ "$?" -ne "1" ]; then
         # TODO: Check return value of tmp file creation
-        echo "$XRESINCL" | cat - "$XRESPATH" > /tmp/xres-tmp
-        mv /tmp/xres-tmp "$XRESPATH"
+        echo "$XRES_INCL" | cat - "$XRES_PATH" > /tmp/xres-tmp
+        mv /tmp/xres-tmp "$XRES_PATH"
     fi
 
     # Add xcolor defines to xres if not already there
-    ! grep "\*\.color[0-9]\+:\s\+COLOR[0-9]\+" "$XRESPATH" > /dev/null
+    ! grep "\*\.color[0-9]\+:\s\+COLOR[0-9]\+" "$XRES_PATH" > /dev/null
     if [ "$?" -ne "1" ]; then
-        echo "$XRESDEFS" >> "$XRESPATH"
+        echo "$XRES_DEFS" >> "$XRES_PATH"
     fi
 }
 
 copy_theme() {
-    rm -f "$CONFIGDIR"/x.colors
-    printf "! Current xcolor theme: %s\n\n" "$THEME" > "$CONFIGDIR/x.colors"
-    cat "$THEMEPATH" >> "$CONFIGDIR"/x.colors
+    rm -f "$CONFIG_DIR"/x.colors
+    printf "! Current xcolor theme: %s\n\n" "$THEME" > "$CONFIG_DIR/x.colors"
+    cat "$THEME_PATH" >> "$CONFIG_DIR"/x.colors
+}
+
+## Reload Functions ##
+
+rel_tty() {
+    for tty in /dev/pts/[0-9]*; do
+        if [ -w "$tty" ]; then
+            tr -d "\n" < "$CACHE_DIR"/xcolor.sequence > "$tty" &
+        fi
+    done
 }
 
 rel_xres() {
     if [ -z "$XRDB_CPP" ]; then
-        xrdb -merge "$XRESPATH" > /dev/null
+        xrdb -merge "$XRES_PATH" > /dev/null
     else
-        xrdb -merge -cpp "${XRDB_CPP:-"default"}" "$XRESPATH" > /dev/null
+        xrdb -merge -cpp "${XRDB_CPP:-"default"}" "$XRES_PATH" > /dev/null
     fi
 }
 
 rel_i3() {
-    i3-msg reload  > /dev/null
+    i3-msg reload > /dev/null
+}
+
+rel_sway() {
+    swaymsg reload > /dev/null
+}
+
+rel_bspwm() {
+    bspc wm -r > /dev/null
 }
 
 rel_polybar() {
-    pkill -USR1 polybar > /dev/null
+    pkill -USR1 -x polybar > /dev/null
 }
 
 rel_if_alive() {
@@ -342,6 +375,8 @@ rel_if_alive() {
         rel_"$*"
     fi
 }
+
+## Main ##
 
 # Assemble and execute args
 check_config_dir
@@ -355,11 +390,12 @@ copy_theme
 rel_xres
 
 # If PID exists, reload
-rel_if_alive "i3"
-rel_if_alive "polybar"
+for proc in $PROC_LIST; do
+    rel_if_alive "$proc"
+done
 
 # Update current TTYs
 read_theme
 check_cache_dir
 make_esc_seq
-update_tty
+rel_tty
