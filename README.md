@@ -23,14 +23,18 @@ Terminal Emulators:
 * `urxvt`
 * `xterm`
 * `st` (requires xresources patch)
+* `xst`
+* `termite`
 
 WMs/DEs:
 
-* `i3`<sup>1</sup>
+* `i3`
+* `sway`
+* `bspwm`
 
 Bars:
 
-* `polybar`<sup>2</sup>
+* `polybar`
 
 This list will be updated as more configurations are tested.
 
@@ -53,17 +57,34 @@ cd xcolor
 
 Xcolor now supports over 200 themes!
 
-To create your own, simply a copy of the template (located at `themes/template`) and edit the hex color values to your liking. When you're finished, just copy it to `$XDG_CONFIG_HOME/xcolor/` and you're good to go!
+To create your own, simply a copy of the template (located at `themes/template`) and edit the hex color values to your liking. When you're finished, just copy it to `$XDG_CONFIG_HOME/xcolor/themes` and you're good to go!
 
-## WM, DE, and Bar Configurations
+## How do I use these colors in other programs?
 
-<sup>1</sup>Use the following for your polybar color configurations:
+### Polybar
 
-`${xrdb:COLOR-NUM:FALLBACK-COLOR}` e.g. `foreground = ${xrdb:color15:#ffffff}`
+Polybar can source its various colors from `.Xresources` with the following syntax:
 
-<sup>2</sup>i3 allows you to bring colors from your `.Xresources` with the `set_from_resource` keyword. You can then use this color for whatever you want in i3. The general format is `set_from_resource $name_for_i3 color_num backup_color`. For example, to set the focused window borders to bold yellow you could do the following:
+`${xrdb:XRESOURCE-COLOR:FALLBACK-COLOR}`
 
+Example:
+
+```ini
+; Set background and foreground colors
+background = ${xrdb:color0:#ffffff}
+foreground = ${xrdb:color15:#ffffff}
 ```
+
+### i3
+
+i3 allows you to source resources into variables via the `set_from_resource` keyword. The general format is:
+
+`set_from_resource $name_for_i3 color_num backup_color`
+
+Example:
+
+```bash
+# Set the focused window borders to bold yellow
 set_from_resource $yellow_b color11 #ffffff
 client.focused $yellow_b $yellow_b $yellow_b $yellow_b
 ```
