@@ -88,3 +88,13 @@ Example:
 set_from_resource $yellow_b color11 #ffffff
 client.focused $yellow_b $yellow_b $yellow_b $yellow_b
 ```
+
+### rofi
+
+As of version 0.4.3, a new file will appear in the `$XDG_CACHE_HOME/xcolor` directory by the name of `xcolor.rasi`. This file may be imported into a rofi `.rasi` configuration to synchronize rofi with xcolor. To do this, add the following to the **end** of your `.rasi` config (replacing `USER` with the appropriate username):
+
+```css
+@import "/home/USER/.cache/xcolor/xcolor.rasi"
+```
+
+This file defines the current xcolor theme colors for use as `@foreground`, `@background`, `@cursor`, and `@color[0-15]`.
