@@ -2,7 +2,7 @@
 
 set -eCu
 
-VERSION="0.4.2"
+VERSION="0.4.3"
 
 OPTS=":hvlcrfs:d:t:"
 
