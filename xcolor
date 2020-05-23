@@ -78,6 +78,9 @@ check_cache_dir() {
     if   [ -f "$CACHE_DIR"/xcolor.sequence ]; then
         rm -f "$CACHE_DIR"/xcolor.sequence
     fi
+    if   [ -f "$CACHE_DIR"/xcolor.rasi ]; then
+        rm -f "$CACHE_DIR"/xcolor.rasi
+    fi
 }
 
 usage() {
@@ -131,7 +134,6 @@ rand_theme() {
     echo "theme selected: $THEME"
 }
 
-# Change to get_curr_theme
 get_curr_theme() {
     CURR_THEME=$(grep "!" "$CONFIG_DIR"/x.colors | sed "s/^.*: //") > /dev/null
 }
@@ -308,6 +310,31 @@ make_esc_seq() {
 ]708;$BACKGROUND\\" > "$CACHE_DIR"/xcolor.sequence
 }
 
+make_rasi() {
+    echo "\
+* {
+  foreground:    $FOREGROUND;
+  background:    $BACKGROUND;
+  cursor:        $CURSOR;
+  color0:        $COLOR0; /* Black   (Normal) */
+  color1:        $COLOR1; /* Red     (Normal) */
+  color2:        $COLOR2; /* Yellow  (Normal) */
+  color3:        $COLOR3; /* Green   (Normal) */
+  color4:        $COLOR4; /* Blue    (Normal) */
+  color5:        $COLOR5; /* Magenta (Normal) */
+  color6:        $COLOR6; /* Cyan    (Normal) */
+  color7:        $COLOR7; /* White   (Normal) */
+  color8:        $COLOR8; /* Black   (Bright) */
+  color9:        $COLOR9; /* Red     (Bright) */
+  color10:       $COLOR10; /* Yellow  (Bright) */
+  color11:       $COLOR11; /* Green   (Bright) */
+  color12:       $COLOR12; /* Blue    (Bright) */
+  color13:       $COLOR13; /* Magenta (Bright) */
+  color14:       $COLOR14; /* Cyan    (Bright) */
+  color15:       $COLOR15; /* White   (Bright) */
+}" > "$CACHE_DIR"/xcolor.rasi
+}
+
 check_xres() {
     # Create .Xresources if not already there
     if ! [ -f "$XRES_PATH" ]; then
@@ -318,8 +345,8 @@ check_xres() {
     ! grep "$XRES_INCL" "$XRES_PATH" > /dev/null
     if [ "$?" -ne "1" ]; then
         # TODO: Check return value of tmp file creation
-        echo "$XRES_INCL" | cat - "$XRES_PATH" > /tmp/xres-tmp
-        mv /tmp/xres-tmp "$XRES_PATH"
+        echo "$XRES_INCL" | cat - "$XRES_PATH" > /tmp/xcolor.xres
+        mv /tmp/xcolor.xres "$XRES_PATH"
     fi
 
     # Add xcolor defines to xres if not already there
@@ -370,8 +397,7 @@ rel_polybar() {
 }
 
 rel_if_alive() {
-    ! pgrep "$*" > /dev/null
-    if [ "$?" -eq "1" ]; then
+    if pgrep "$*" > /dev/null; then
         rel_"$*"
     fi
 }
@@ -398,4 +424,7 @@ done
 read_theme
 check_cache_dir
 make_esc_seq
+make_rasi
 rel_tty
+
+exit 0
