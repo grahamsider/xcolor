@@ -2,7 +2,7 @@
 
 set -eCu
 
-VERSION="0.4.4"
+VERSION="0.4.5"
 
 OPTS=":hvlcrfs:d:t:"
 
@@ -402,6 +402,12 @@ make_cache_files() {
 
 ## Reload Functions ##
 
+update_spicetify() {
+    if command -v spicetify > /dev/null; then
+        spicetify update > /dev/null
+    fi
+}
+
 rel_tty() {
     for tty in /dev/pts/[0-9]*; do
         if [ -w "$tty" ]; then
@@ -452,6 +458,7 @@ check_theme "$THEME"
 check_xres
 copy_theme
 rel_xres
+update_spicetify
 
 # If PID exists, reload
 for proc in $PROC_LIST; do
