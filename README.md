@@ -1,5 +1,5 @@
 <p align="center">
-    <img src=".github/xcolor-demo-rounded.gif" alt="Demo" width="540"/>
+    <img src=".github/xcolor-demo-v2-rounded.gif" alt="Demo" width="400"/>
 </p>
 
 # Xcolor
