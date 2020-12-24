@@ -2,7 +2,7 @@
 
 set -eCu
 
-VERSION="0.4.3"
+VERSION="0.4.6"
 
 OPTS=":hvlcrfs:d:t:"
 
@@ -81,10 +81,16 @@ check_cache_dir() {
     if   [ -f "$CACHE_DIR"/xcolor.rasi ]; then
         rm -f "$CACHE_DIR"/xcolor.rasi
     fi
+    if   [ -f "$CACHE_DIR"/xcolor.py ]; then
+        rm -f "$CACHE_DIR"/xcolor.py
+    fi
+    if   [ -f "$CACHE_DIR"/xcolor.zathura ]; then
+        rm -f "$CACHE_DIR"/xcolor.zathura
+    fi
 }
 
 usage() {
-    echo "Usage: ./xcolor [options]
+    printf "Usage: ./xcolor [options]
        -t (theme):      select theme
        -r (random):     select random theme
        -l (list):       list themes
@@ -93,13 +99,13 @@ usage() {
        -d (delete):     delete theme to favorites
        -f (favorites):  use favorite themes for query
        -v (version):    show xcolor version and exit
-       -h (help):       show usage"
+       -h (help):       show usage\n"
 }
 
 list_themes() {
     if [ "$ARG_FAV" -eq "0" ]; then
         if ! [ "$(find "$THEMES_DIR" -name "*.colors" -type f)" ]; then
-            echo "no themes installed!"
+            printf "no themes installed!\n"
         else
             find "$THEMES_DIR" -name "*.colors" -type f | sed "s/^.*\///; s/.colors//"
         fi
@@ -131,7 +137,7 @@ rand_theme() {
         fi
     fi
 
-    echo "theme selected: $THEME"
+    printf "theme selected: $THEME\n"
 }
 
 get_curr_theme() {
@@ -158,13 +164,13 @@ save_theme() {
     # Check if theme is in favorites
     ! grep "^$SAVE_DEL_THEME$" "$FAV_PATH" > /dev/null
     if [ "$?" -eq "1" ]; then
-        echo "error: $SAVE_DEL_THEME already in favorites"
+        printf "error: $SAVE_DEL_THEME already in favorites\n"
         exit 1
     fi
 
     # Add theme to favorites
     echo "$SAVE_DEL_THEME" >> "$FAV_PATH"
-    echo "$SAVE_DEL_THEME added to favorites"
+    printf "$SAVE_DEL_THEME added to favorites\n"
 }
 
 del_theme() {
@@ -172,14 +178,14 @@ del_theme() {
 
     # Check if xcolor.favorites exists
     if ! [ -f "$FAV_PATH" ]; then
-        echo "error: $SAVE_DEL_THEME is not in favorites"
+        printf "error: $SAVE_DEL_THEME is not in favorites\n"
         exit 1
     fi
 
     # Check if theme is in favorites
     ! grep -w "^$SAVE_DEL_THEME$" "$FAV_PATH" > /dev/null
     if [ "$?" -ne "1" ]; then
-        echo "error: $SAVE_DEL_THEME is not in favorites"
+         printf "error: $SAVE_DEL_THEME is not in favorites\n"
         exit 1
     fi
 
@@ -187,7 +193,7 @@ del_theme() {
     sed "/^$SAVE_DEL_THEME$/d" "$FAV_PATH" > /tmp/xcolor.favorites
     rm -f "$FAV_PATH"
     mv /tmp/xcolor.favorites "$FAV_PATH"
-    echo "$SAVE_DEL_THEME deleted from favorites"
+     printf "$SAVE_DEL_THEME deleted from favorites\n"
 }
 
 parse_args() {
@@ -227,7 +233,7 @@ parse_args() {
             : )
                 case "$OPTARG" in
                     t )
-                        echo "error: please select theme"
+                        printf "error: please select theme\n"
                         exit 1
                         ;;
                     s )
@@ -253,17 +259,20 @@ exec_args() {
         exit 0
     elif [ "$ARG_CURR" -eq 1 ]; then
         get_curr_theme
-        echo "$CURR_THEME"
+        printf "$CURR_THEME\n"
         exit 0
     elif [ "$ARG_LIST" -eq 1 ]; then
         list_themes
         exit 0
     elif [ "$ARG_VER"  -eq 1 ]; then
-        echo "xcolor $VERSION"
+        printf "xcolor $VERSION\n"
         exit 0
     elif [ "$ARG_RAND" -eq 1 ]; then
         get_curr_theme
         rand_theme
+    elif [ "$ARG_FAV" -eq 1 ]; then
+        usage
+        exit 1
     fi
 }
 
@@ -271,18 +280,46 @@ check_theme() {
     THEME_PATH="$THEMES_DIR/$*.colors"
 
     if ! [ -f "$THEME_PATH" ]; then
-        echo "error: $*.colors does not exist"
+        printf "error: $*.colors does not exist\n"
         exit 1
     fi
 }
 
 read_theme() {
-    # Word splitting on the set
-    # command here is intentional
+    # Word splitting on the set command here is intentional
     while read -r LINE; do
         eval "$(echo "$LINE" | sed "s/\#define\s\+//; s/\s.*$//")"="$(echo "$LINE" | sed "s/^.*\s//")"
     done < "$THEME_PATH"
 }
+
+copy_theme() {
+    rm -f "$CONFIG_DIR"/x.colors
+    printf "! Current xcolor theme: %s\n\n" "$THEME" > "$CONFIG_DIR/x.colors"
+    cat "$THEME_PATH" >> "$CONFIG_DIR"/x.colors
+}
+
+check_xres() {
+    # Create .Xresources if not already there
+    if ! [ -f "$XRES_PATH" ]; then
+        touch "$XRES_PATH"
+    fi
+
+    # Add x.colors include path to xres if not already there
+    ! grep "$XRES_INCL" "$XRES_PATH" > /dev/null
+    if [ "$?" -ne "1" ]; then
+        # TODO: Check return value of tmp file creation
+        echo "$XRES_INCL" | cat - "$XRES_PATH" > /tmp/xcolor.xres
+        mv /tmp/xcolor.xres "$XRES_PATH"
+    fi
+
+    # Add xcolor defines to xres if not already there
+    ! grep "\*\.color[0-9]\+:\s\+COLOR[0-9]\+" "$XRES_PATH" > /dev/null
+    if [ "$?" -ne "1" ]; then
+        echo "$XRES_DEFS" >> "$XRES_PATH"
+    fi
+}
+
+## Cache Functions ##
 
 make_esc_seq() {
     echo "\
@@ -335,34 +372,55 @@ make_rasi() {
 }" > "$CACHE_DIR"/xcolor.rasi
 }
 
-check_xres() {
-    # Create .Xresources if not already there
-    if ! [ -f "$XRES_PATH" ]; then
-        touch "$XRES_PATH"
-    fi
+make_zathura() {
+    printf "\
+set completion-bg \"$BACKGROUND\"
+set completion-fg \"$FOREGROUND\"
+set completion-group-bg \"$BACKGROUND\"
+set completion-group-fg \"$COLOR2\"
+set completion-highlight-bg \"$FOREGROUND\"
+set completion-highlight-fg \"$BACKGROUND\"
 
-    # Add x.colors include path to xres if not already there
-    ! grep "$XRES_INCL" "$XRES_PATH" > /dev/null
-    if [ "$?" -ne "1" ]; then
-        # TODO: Check return value of tmp file creation
-        echo "$XRES_INCL" | cat - "$XRES_PATH" > /tmp/xcolor.xres
-        mv /tmp/xcolor.xres "$XRES_PATH"
-    fi
+set recolor-lightcolor \"$BACKGROUND\"
+set recolor-darkcolor \"$FOREGROUND\"
 
-    # Add xcolor defines to xres if not already there
-    ! grep "\*\.color[0-9]\+:\s\+COLOR[0-9]\+" "$XRES_PATH" > /dev/null
-    if [ "$?" -ne "1" ]; then
-        echo "$XRES_DEFS" >> "$XRES_PATH"
-    fi
+set default-bg \"$BACKGROUND\"
+
+set inputbar-bg \"$BACKGROUND\"
+set inputbar-fg \"$FOREGROUND\"
+
+set notification-bg \"$BACKGROUND\"
+set notification-fg \"$FOREGROUND\"
+set notification-error-bg \"$COLOR1\"
+set notification-error-fg \"$FOREGROUND\"
+set notification-warning-bg \"$COLOR1\"
+set notification-warning-fg \"$FOREGROUND\"
+
+set statusbar-bg \"$BACKGROUND\"
+set statusbar-fg \"$FOREGROUND\"
+
+set index-bg \"$BACKGROUND\"
+set index-fg \"$FOREGROUND\"
+set index-active-bg \"$FOREGROUND\"
+set index-active-fg \"$BACKGROUND\"
+
+set render-loading-bg \"$BACKGROUND\"
+set render-loading-fg \"$FOREGROUND\"\n" > "$CACHE_DIR"/xcolor.zathura
 }
 
-copy_theme() {
-    rm -f "$CONFIG_DIR"/x.colors
-    printf "! Current xcolor theme: %s\n\n" "$THEME" > "$CONFIG_DIR/x.colors"
-    cat "$THEME_PATH" >> "$CONFIG_DIR"/x.colors
+make_cache_files() {
+    make_esc_seq
+    make_rasi
+    make_zathura
 }
 
 ## Reload Functions ##
+
+update_spicetify() {
+    if command -v spicetify > /dev/null; then
+        spicetify update > /dev/null
+    fi
+}
 
 rel_tty() {
     for tty in /dev/pts/[0-9]*; do
@@ -414,6 +472,7 @@ check_theme "$THEME"
 check_xres
 copy_theme
 rel_xres
+update_spicetify
 
 # If PID exists, reload
 for proc in $PROC_LIST; do
@@ -423,8 +482,7 @@ done
 # Update current TTYs
 read_theme
 check_cache_dir
-make_esc_seq
-make_rasi
+make_cache_files
 rel_tty
 
 exit 0
