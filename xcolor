@@ -2,7 +2,7 @@
 
 set -eCu
 
-VERSION="0.4.5"
+VERSION="0.4.6"
 
 OPTS=":hvlcrfs:d:t:"
 
@@ -84,10 +84,13 @@ check_cache_dir() {
     if   [ -f "$CACHE_DIR"/xcolor.py ]; then
         rm -f "$CACHE_DIR"/xcolor.py
     fi
+    if   [ -f "$CACHE_DIR"/xcolor.zathura ]; then
+        rm -f "$CACHE_DIR"/xcolor.zathura
+    fi
 }
 
 usage() {
-    echo "Usage: ./xcolor [options]
+    printf "Usage: ./xcolor [options]
        -t (theme):      select theme
        -r (random):     select random theme
        -l (list):       list themes
@@ -96,13 +99,13 @@ usage() {
        -d (delete):     delete theme to favorites
        -f (favorites):  use favorite themes for query
        -v (version):    show xcolor version and exit
-       -h (help):       show usage"
+       -h (help):       show usage\n"
 }
 
 list_themes() {
     if [ "$ARG_FAV" -eq "0" ]; then
         if ! [ "$(find "$THEMES_DIR" -name "*.colors" -type f)" ]; then
-            echo "no themes installed!"
+            printf "no themes installed!\n"
         else
             find "$THEMES_DIR" -name "*.colors" -type f | sed "s/^.*\///; s/.colors//"
         fi
@@ -134,7 +137,7 @@ rand_theme() {
         fi
     fi
 
-    echo "theme selected: $THEME"
+    printf "theme selected: $THEME\n"
 }
 
 get_curr_theme() {
@@ -161,13 +164,13 @@ save_theme() {
     # Check if theme is in favorites
     ! grep "^$SAVE_DEL_THEME$" "$FAV_PATH" > /dev/null
     if [ "$?" -eq "1" ]; then
-        echo "error: $SAVE_DEL_THEME already in favorites"
+        printf "error: $SAVE_DEL_THEME already in favorites\n"
         exit 1
     fi
 
     # Add theme to favorites
     echo "$SAVE_DEL_THEME" >> "$FAV_PATH"
-    echo "$SAVE_DEL_THEME added to favorites"
+    printf "$SAVE_DEL_THEME added to favorites\n"
 }
 
 del_theme() {
@@ -175,14 +178,14 @@ del_theme() {
 
     # Check if xcolor.favorites exists
     if ! [ -f "$FAV_PATH" ]; then
-        echo "error: $SAVE_DEL_THEME is not in favorites"
+        printf "error: $SAVE_DEL_THEME is not in favorites\n"
         exit 1
     fi
 
     # Check if theme is in favorites
     ! grep -w "^$SAVE_DEL_THEME$" "$FAV_PATH" > /dev/null
     if [ "$?" -ne "1" ]; then
-        echo "error: $SAVE_DEL_THEME is not in favorites"
+         printf "error: $SAVE_DEL_THEME is not in favorites\n"
         exit 1
     fi
 
@@ -190,7 +193,7 @@ del_theme() {
     sed "/^$SAVE_DEL_THEME$/d" "$FAV_PATH" > /tmp/xcolor.favorites
     rm -f "$FAV_PATH"
     mv /tmp/xcolor.favorites "$FAV_PATH"
-    echo "$SAVE_DEL_THEME deleted from favorites"
+     printf "$SAVE_DEL_THEME deleted from favorites\n"
 }
 
 parse_args() {
@@ -230,7 +233,7 @@ parse_args() {
             : )
                 case "$OPTARG" in
                     t )
-                        echo "error: please select theme"
+                        printf "error: please select theme\n"
                         exit 1
                         ;;
                     s )
@@ -256,17 +259,20 @@ exec_args() {
         exit 0
     elif [ "$ARG_CURR" -eq 1 ]; then
         get_curr_theme
-        echo "$CURR_THEME"
+        printf "$CURR_THEME\n"
         exit 0
     elif [ "$ARG_LIST" -eq 1 ]; then
         list_themes
         exit 0
     elif [ "$ARG_VER"  -eq 1 ]; then
-        echo "xcolor $VERSION"
+        printf "xcolor $VERSION\n"
         exit 0
     elif [ "$ARG_RAND" -eq 1 ]; then
         get_curr_theme
         rand_theme
+    elif [ "$ARG_FAV" -eq 1 ]; then
+        usage
+        exit 1
     fi
 }
 
@@ -274,14 +280,13 @@ check_theme() {
     THEME_PATH="$THEMES_DIR/$*.colors"
 
     if ! [ -f "$THEME_PATH" ]; then
-        echo "error: $*.colors does not exist"
+        printf "error: $*.colors does not exist\n"
         exit 1
     fi
 }
 
 read_theme() {
-    # Word splitting on the set
-    # command here is intentional
+    # Word splitting on the set command here is intentional
     while read -r LINE; do
         eval "$(echo "$LINE" | sed "s/\#define\s\+//; s/\s.*$//")"="$(echo "$LINE" | sed "s/^.*\s//")"
     done < "$THEME_PATH"
@@ -367,37 +372,46 @@ make_rasi() {
 }" > "$CACHE_DIR"/xcolor.rasi
 }
 
-make_py() {
-    echo "\
-#!/usr/bin/env python3
+make_zathura() {
+    printf "\
+set completion-bg \"$BACKGROUND\"
+set completion-fg \"$FOREGROUND\"
+set completion-group-bg \"$BACKGROUND\"
+set completion-group-fg \"$COLOR2\"
+set completion-highlight-bg \"$FOREGROUND\"
+set completion-highlight-fg \"$BACKGROUND\"
 
-xcdict = {
-    'foreground':    '$FOREGROUND',
-    'background':    '$BACKGROUND',
-    'cursor':        '$CURSOR',
-    'color0':        '$COLOR0', # Black   (Normal)
-    'color1':        '$COLOR1', # Red     (Normal)
-    'color2':        '$COLOR2', # Yellow  (Normal)
-    'color3':        '$COLOR3', # Green   (Normal)
-    'color4':        '$COLOR4', # Blue    (Normal)
-    'color5':        '$COLOR5', # Magenta (Normal)
-    'color6':        '$COLOR6', # Cyan    (Normal)
-    'color7':        '$COLOR7', # White   (Normal)
-    'color8':        '$COLOR8', # Black   (Bright)
-    'color9':        '$COLOR9', # Red     (Bright)
-    'color10':       '$COLOR10', # Yellow  (Bright)
-    'color11':       '$COLOR11', # Green   (Bright)
-    'color12':       '$COLOR12', # Blue    (Bright)
-    'color13':       '$COLOR13', # Magenta (Bright)
-    'color14':       '$COLOR14', # Cyan    (Bright)
-    'color15':       '$COLOR15', # White   (Bright)
-}" > "$CACHE_DIR"/xcolor.py
+set recolor-lightcolor \"$BACKGROUND\"
+set recolor-darkcolor \"$FOREGROUND\"
+
+set default-bg \"$BACKGROUND\"
+
+set inputbar-bg \"$BACKGROUND\"
+set inputbar-fg \"$FOREGROUND\"
+
+set notification-bg \"$BACKGROUND\"
+set notification-fg \"$FOREGROUND\"
+set notification-error-bg \"$COLOR1\"
+set notification-error-fg \"$FOREGROUND\"
+set notification-warning-bg \"$COLOR1\"
+set notification-warning-fg \"$FOREGROUND\"
+
+set statusbar-bg \"$BACKGROUND\"
+set statusbar-fg \"$FOREGROUND\"
+
+set index-bg \"$BACKGROUND\"
+set index-fg \"$FOREGROUND\"
+set index-active-bg \"$FOREGROUND\"
+set index-active-fg \"$BACKGROUND\"
+
+set render-loading-bg \"$BACKGROUND\"
+set render-loading-fg \"$FOREGROUND\"\n" > "$CACHE_DIR"/xcolor.zathura
 }
 
 make_cache_files() {
     make_esc_seq
     make_rasi
-    make_py
+    make_zathura
 }
 
 ## Reload Functions ##
