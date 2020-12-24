@@ -164,10 +164,10 @@ TODO
 
 ### Zathura
 
-As of version 0.4.6, a new file will appear in the `$XDG_CACHE_HOME/xcolor` directory by the name of `xcolor.zathura`. This may be sourced and used for by putting the following into your `zathurarc`:
+As of version 0.4.6, a new file will appear in the `$XDG_CACHE_HOME/xcolor` directory by the name of `xcolor.zathura`. This may be sourced and used for by putting the following into your `zathurarc` (replacing `USER` with the appropriate username):
 
 ```
-include /home/gs/.cache/xcolor/xcolor.zathura
+include /home/USER/.cache/xcolor/xcolor.zathura
 
 set recolor true
 ```
