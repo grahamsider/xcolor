@@ -36,7 +36,7 @@ WMs/DEs:
 Bars:
 
 * `polybar`
-* `xmobar` (assuming background and foreground is configured in launch script)
+* `xmobar` 
 
 This list will be updated as more configurations are tested.
 
@@ -301,6 +301,8 @@ Credits to reddit user [/u/Joantmilev](https://www.reddit.com/user/Joantmilev/) 
 
 Xmobar is traditionally use with the Xmonad WM. Within your xmonad.hs use the [`fromXres`](#haskell-xres-func) function as so:
 ```
+    xmobarBgColor = fromXres "*.color0"
+    xmobarFgColor = fromXres "*.color15"
     spawnPipe $ "xmobar " ++ 
                 "-B \"" ++ xmobarBgColor ++  "\" " ++ -- Set the background color
                 "-F \"" ++ xmobarFgColor ++  "\" " ++ -- Set the foreground color
