@@ -31,10 +31,12 @@ WMs/DEs:
 * `i3`
 * `sway`
 * `bspwm`
+* `xmonad`
 
 Bars:
 
 * `polybar`
+* `xmobar` 
 
 This list will be updated as more configurations are tested.
 
@@ -253,3 +255,56 @@ c.colors.statusbar.url.success.https.fg = adjust(fg, 0.7)
 ### Shell Scripts
 
 Querying `.Xresources` variables can be done via `xrdb -query`. This can be further piped through applications such as `grep` and `sed` to extract the desired string.
+
+### <a name="haskell-xres-func"></a>XMonad/Haskell
+
+XResources can be configured using the function fromXres defined below:
+```
+import Data.Maybe
+import Data.Bifunctor
+import Data.List as DL
+import Data.Char as DC
+
+import System.IO
+import System.IO.Unsafe
+
+import XMonad
+import XMonad.Util.Run
+
+getFromXres :: String -> IO String
+getFromXres key = fromMaybe "" . findValue key <$> runProcessWithInput "xrdb" ["-query"] ""
+  where
+    findValue :: String -> String -> Maybe String
+    findValue xresKey xres =
+      snd <$> (
+                DL.find ((== xresKey) . fst)
+                $ catMaybes
+                $ splitAtColon
+                <$> lines xres
+              )
+
+    splitAtColon :: String -> Maybe (String, String)
+    splitAtColon str = splitAtTrimming str <$> (DL.elemIndex ':' str)
+
+    splitAtTrimming :: String -> Int -> (String, String)
+    splitAtTrimming str idx = bimap trim trim . (second tail) $ splitAt idx str
+
+    trim :: String -> String
+    trim = DL.dropWhileEnd (DC.isSpace) . DL.dropWhile (DC.isSpace)
+
+fromXres :: String -> String
+fromXres = unsafePerformIO . getFromXres
+```
+Credits to reddit user [/u/Joantmilev](https://www.reddit.com/user/Joantmilev/) from this [thread](https://www.reddit.com/r/xmonad/comments/kfwfma/how_to_pull_xresources_for_xmonad_config_settings/).
+
+### Xmobar
+
+Xmobar is traditionally use with the Xmonad WM. Within your xmonad.hs use the [`fromXres`](#haskell-xres-func) function as so:
+```
+    xmobarBgColor = fromXres "*.color0"
+    xmobarFgColor = fromXres "*.color15"
+    spawnPipe $ "xmobar " ++ 
+                "-B \"" ++ xmobarBgColor ++  "\" " ++ -- Set the background color
+                "-F \"" ++ xmobarFgColor ++  "\" " ++ -- Set the foreground color
+                -- ... continue configuration
+```
