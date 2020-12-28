@@ -259,7 +259,8 @@ Querying `.Xresources` variables can be done via `xrdb -query`. This can be furt
 ### <a name="haskell-xres-func"></a>XMonad/Haskell
 
 XResources can be configured using the function fromXres defined below:
-```
+
+```haskell
 import Data.Maybe
 import Data.Bifunctor
 import Data.List as DL
@@ -300,7 +301,8 @@ Credits to reddit user [/u/Joantmilev](https://www.reddit.com/user/Joantmilev/) 
 ### Xmobar
 
 Xmobar is traditionally use with the Xmonad WM. Within your xmonad.hs use the [`fromXres`](#haskell-xres-func) function as so:
-```
+
+```haskell
     xmobarBgColor = fromXres "*.color0"
     xmobarFgColor = fromXres "*.color15"
     spawnPipe $ "xmobar " ++ 
