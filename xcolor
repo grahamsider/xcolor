@@ -18,7 +18,7 @@ XRDB_CPP=${XRDB_CPP:-""}
 
 # Process list that xcolor will attempt to reload after a
 # theme change. Will only reload if alive prior to execution
-PROC_LIST="i3 bspwm sway polybar"
+PROC_LIST="i3 bspwm sway polybar xmonad"
 
 THEME=""
 SAVE_DEL_THEME=""
@@ -452,6 +452,10 @@ rel_bspwm() {
 
 rel_polybar() {
     pkill -USR1 -x polybar > /dev/null
+}
+
+rel_xmonad() {
+    xmonad --restart > /dev/null
 }
 
 rel_if_alive() {
