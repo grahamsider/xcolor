@@ -2,7 +2,7 @@
 
 set -eCu
 
-VERSION="0.4.6"
+VERSION="0.4.7"
 
 OPTS=":hvlcrfs:d:t:"
 
@@ -418,7 +418,8 @@ make_cache_files() {
 
 update_spicetify() {
     if command -v spicetify > /dev/null; then
-        spicetify update > /dev/null
+        spicetify update > /dev/null ||
+            { echo "warning: spicetify update failed (check issue by running manually)"; }
     fi
 }
 
